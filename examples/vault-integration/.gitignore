@@ -1,3 +1,4 @@
 bin/
 *.csr
 *.pem
+vault-init.json

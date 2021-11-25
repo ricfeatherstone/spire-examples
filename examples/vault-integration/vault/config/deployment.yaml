@@ -1,0 +1,95 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: vault
+          image: vault:1.8.4
+          command:
+            - /bin/sh
+            - -ec
+          args:
+            - /usr/local/bin/docker-entrypoint.sh vault server -config /vault/config/config.hcl
+          env:
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.hostIP
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: VAULT_ADDR
+              value: https://127.0.0.1:8200
+            - name: VAULT_API_ADDR
+              value: https://$(POD_IP):8200
+            - name: SKIP_CHOWN
+              value: "true"
+            - name: SKIP_SETCAP
+              value: "true"
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: VAULT_CLUSTER_ADDR
+              value: https://$(HOSTNAME).vault-internal:8201
+            - name: HOME
+              value: /home/vault
+            - name: VAULT_CACERT
+              value: /var/run/secrets/tls/ca.crt
+          volumeMounts:
+            - name: config
+              mountPath: /vault/config
+              readOnly: true
+            - name: vault-tls
+              mountPath: /var/run/secrets/tls
+              readOnly: true
+            - name: home
+              mountPath: /home/vault
+              readOnly: true
+          ports:
+            - containerPort: 8200
+              name: https
+              protocol: TCP
+            - containerPort: 8201
+              name: https-internal
+              protocol: TCP
+            - containerPort: 8202
+              name: https-rep
+              protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -ec
+                - vault status -tls-skip-verify
+            failureThreshold: 2
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+      serviceAccountName: vault
+      volumes:
+        - name: config
+          configMap:
+            defaultMode: 420
+            name: vault-config
+        - name: vault-tls
+          projected:
+            sources:
+              - secret:
+                  name: ca
+              - secret:
+                  name: vault-tls
+        - name: home
+          emptyDir: { }

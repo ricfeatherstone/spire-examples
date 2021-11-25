@@ -20,3 +20,4 @@ if [ ! -f ca.pem ]; then
       certs/vault-csr.json | cfssljson -bare certs/vault
 fi
 
+cp certs/ca.pem certs/vault.pem certs/vault-key.pem config

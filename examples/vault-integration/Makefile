@@ -22,3 +22,9 @@ generate-certs: cleanup-certs
 cleanup-certs:
 	-cd vault && ./cleanup-certs.sh
 
+deploy-vault: generate-certs
+	kubectl create ns vault
+	kubectl apply -k vault/config
+
+configure-vault:
+	cd vault && ./configure-vault.sh

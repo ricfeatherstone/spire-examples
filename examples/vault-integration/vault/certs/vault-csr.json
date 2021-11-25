@@ -1,0 +1,11 @@
+{
+  "CN": "vault.spire-examples",
+  "hosts": [
+    "vault.vault.svc",
+    "127.0.0.1"
+  ],
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  }
+}

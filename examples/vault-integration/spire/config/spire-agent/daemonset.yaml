@@ -1,0 +1,121 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: spire-agent
+spec:
+  template:
+    spec:
+      hostPID: true
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      serviceAccountName: spire-agent
+      initContainers:
+        - name: wait-for-server
+          image: gcr.io/spiffe-io/wait-for-it
+          args:
+            - -t
+            - '30'
+            - spire-server:8081
+      containers:
+        - name: spire-agent
+          image: gcr.io/spiffe-io/spire-agent:1.1.1
+          args:
+            - -config
+            - /run/spire/config/agent.hcl
+          volumeMounts:
+            - name: spire-data
+              mountPath: /run/spire/data/agent
+            - name: spire-config
+              mountPath: /run/spire/config
+              readOnly: true
+            - name: spire-bundle
+              mountPath: /run/spire/bundle
+            - name: spire-token
+              mountPath: /run/spire/tokens
+              readOnly: true
+            - name: spire-agent-socket-dir
+              mountPath: /run/spire/sockets
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 8080
+            failureThreshold: 2
+            initialDelaySeconds: 15
+            periodSeconds: 60
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+        - name: spiffe-csi-driver
+          image: ghcr.io/spiffe/spiffe-csi-driver:nightly
+          imagePullPolicy: IfNotPresent
+          args:
+            - -workload-api-socket-dir
+            - /spire-agent-socket
+            - -csi-socket-path
+            - /spiffe-csi/csi.sock
+          env:
+            - name: MY_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - mountPath: /spire-agent-socket
+              name: spire-agent-socket-dir
+              readOnly: true
+            - mountPath: /spiffe-csi
+              name: spiffe-csi-socket-dir
+            - mountPath: /var/lib/kubelet/pods
+              mountPropagation: Bidirectional
+              name: mountpoint-dir
+          securityContext:
+            privileged: true
+        - name: node-driver-registrar
+          image: quay.io/k8scsi/csi-node-driver-registrar:v2.0.1
+          imagePullPolicy: IfNotPresent
+          args:
+            - -csi-address
+            - /spiffe-csi/csi.sock
+            - -kubelet-registration-path
+            - /var/lib/kubelet/plugins/csi.spiffe.io/csi.sock
+          volumeMounts:
+            - mountPath: /spiffe-csi
+              name: spiffe-csi-socket-dir
+            - name: kubelet-plugin-registration-dir
+              mountPath: /registration
+      volumes:
+        - name: spire-data
+          emptyDir:
+            medium: Memory
+        - name: spire-config
+          configMap:
+            name: spire-agent
+        - name: spire-bundle
+          configMap:
+            name: spire-bundle
+        - name: spire-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: spire-token
+                  audience: spire
+                  expirationSeconds: 900
+        - name: spire-agent-socket-dir
+          emptyDir:
+            medium: Memory
+        - name: spiffe-csi-socket-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/csi.spiffe.io
+            type: DirectoryOrCreate
+        - name: mountpoint-dir
+          hostPath:
+            path: /var/lib/kubelet/pods
+            type: Directory
+        - name: kubelet-plugin-registration-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry
+            type: Directory

@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+commonLabels:
+  app.kubernetes.io/name: spire-agent
+  app.kubernetes.io/version: 1.1.1
+  app.kubernetes.io/component: agent
+  app.kubernetes.io/part-of: spire
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+  - name: spire-agent
+    files:
+      - agent.hcl
+resources:
+  - sa.yaml
+  - cluster-role.yaml
+  - cluster-role-binding.yaml
+  - daemonset.yaml

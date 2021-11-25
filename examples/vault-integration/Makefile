@@ -28,3 +28,10 @@ deploy-vault: generate-certs
 
 configure-vault:
 	cd vault && ./configure-vault.sh
+
+deploy-spire:
+	kubectl create ns spire
+	kubectl apply -k spire/config
+
+configure-spire:
+	./spire/register-entries.sh

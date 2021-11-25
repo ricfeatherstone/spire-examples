@@ -1,0 +1,54 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spire-server
+spec:
+  replicas: 1
+  template:
+    spec:
+      serviceAccountName: spire-server
+      containers:
+        - name: spire-server
+          image: gcr.io/spiffe-io/spire-server:1.1.1
+          args:
+            - -config
+            - /run/spire/config/server.hcl
+          ports:
+            - containerPort: 8081
+          volumeMounts:
+            - name: spire-data
+              mountPath: /run/spire/data
+            - name: spire-config
+              mountPath: /run/spire/config
+              readOnly: true
+            - mountPath: /var/run/secrets/tokens
+              name: vault-token
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 8080
+            failureThreshold: 2
+            initialDelaySeconds: 15
+            periodSeconds: 60
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: spire-data
+          emptyDir:
+            medium: Memory
+        - name: spire-config
+          configMap:
+            name: spire-server
+        - name: vault-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: vault-token
+                  audience: vault
+                  expirationSeconds: 900

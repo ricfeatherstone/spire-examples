@@ -20,4 +20,8 @@ if [ ! -f ca.pem ]; then
       certs/vault-csr.json | cfssljson -bare certs/vault
 fi
 
-cp certs/ca.pem certs/vault.pem certs/vault-key.pem config
+for dest in config ../workload; do
+  cp certs/ca.pem $dest
+done
+
+cp certs/vault.pem certs/vault-key.pem config

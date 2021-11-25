@@ -1,0 +1,35 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workload
+spec:
+  replicas: 1
+  template:
+    spec:
+      serviceAccountName: workload
+      containers:
+        - name: workload
+          image: workload:latest
+          imagePullPolicy: Never
+          env:
+            - name: SPIFFE_ENDPOINT_SOCKET
+              value: unix:///spire-agent-socket/agent.sock
+          volumeMounts:
+            - name: spiffe-helper-config
+              mountPath: /opt/spire/config
+            - name: svids
+              mountPath: /var/run/secrets/svid
+            - name: spire-agent-socket
+              mountPath: /spire-agent-socket
+              readOnly: true
+      volumes:
+        - name: spiffe-helper-config
+          configMap:
+            name: spiffe-helper-config
+        - name: svids
+          emptyDir:
+            medium: Memory
+        - name: spire-agent-socket
+          csi:
+            driver: csi.spiffe.io
